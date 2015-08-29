@@ -9,12 +9,9 @@ var axes = {
   y: d3.scale.linear().domain([0,100]).range([0,gameOptions.height])
 };
 
-d3.select(".container").append("svg:svg")
-  .attr("class", "gameBackDrop")
-  .attr("width", gameOptions.width)
-  .attr("height", gameOptions.height)
-
-var gameBoard = d3.select(".gameBackDrop")
+var randomize = function() {
+  return Math.random() * 100;
+}
 
 var Unit = function(x, y, type) {
   this.x = axes.x(x);
@@ -27,8 +24,43 @@ Unit.prototype.newPosition = function() {
   this.y = axes.y(randomize());
 }
 
-var randomize = function() {
-  return Math.random() * 100;
+d3.select(".container").append("svg:svg")
+  .attr("class", "gameBackDrop")
+  .attr("width", gameOptions.width)
+  .attr("height", gameOptions.height);
+
+var gameBoard = d3.select(".gameBackDrop")
+
+var drag = d3.behavior.drag()
+            .origin(function(d) { return d;})
+            .on('dragstart', dragstarted)
+            .on('drag', dragged);
+            // .on('dragend', dragended)
+
+function dragstarted(d) {
+  d3.event.sourceEvent.stopPropagation();
+}
+
+function dragged(d) {
+  d3.select(this).attr('cx', function(d) {
+    if (d3.event.x<0) {
+      d.x = 0;
+    } else if (d3.event.x>gameOptions.width) {
+      d.x = gameOptions.width;
+    } else {
+      d.x = d3.event.x
+    }
+    return d.x;
+  }).attr('cy',function(d) {
+    if (d3.event.y<0) {
+      d.y = 0;
+    } else if (d3.event.y>gameOptions.height) {
+      d.y = gameOptions.height;
+    } else {
+      d.y = d3.event.y
+    }
+    return d.y;
+  });
 }
 
 var checkCollision = function(enemyD3) {
@@ -42,7 +74,18 @@ var checkCollision = function(enemyD3) {
   // hero.size*2 works as long as objects are the same size
   // could use hero.size+enemyD3.attr('r');
   if ( dist < (hero.size * 2) ) {
-    console.log('collision');
+    var high = d3.select('.high').select('span');
+    var current = d3.select('.current').select('span');
+    var collisions = d3.select('.collisions').select('span');
+    collisions.text(parseInt(collisions.text())+1);
+    if (parseInt(high.text()) < parseInt(current.text())) {
+      high.text(parseInt(current.text()));
+    }
+    current.text(0);
+    d3.select(".gameBackDrop").style("background-color", "red")
+    setTimeout( function() {
+      d3.select(".gameBackDrop").style("background-color", "#94B8FF")
+    }, 300);
   }
 };
 
@@ -53,6 +96,8 @@ for(var i = 0; i < 10; i++){
   enemyArray.push( new Unit(randomize(), randomize()) );
 }
 
+
+
 var startingBoard = enemyArray.slice();
 startingBoard.push(hero);
 
@@ -62,18 +107,17 @@ gameBoard.selectAll("svg")
     .append("circle")
     .attr('cx',function(d){ return d.x;})
     .attr('cy',function(d){return d.y;})
-    .attr('fill',function(d) {
-      if (d.type==='hero') {
-        return '#f00';
-      } else {
-        return '#000';
-      }
+    .attr('class',function(d) {
+      if (d.type==='hero') d3.select(this).call(drag);
+      return d.type;
     })
     .attr('r', hero.size);
 
 function update() {
-  gameBoard.selectAll('circle')
-    .data(enemyArray)
+  var current = d3.select('.current').select('span');
+  current.text(parseInt(current.text())+1);
+  gameBoard.selectAll('.enemy')
+ //   .data(enemyArray)
     .transition()
     .duration(1500)
     .tween('collisions',function(enemy) {
@@ -85,7 +129,7 @@ function update() {
       var enemyD3 = d3.select(this);
       return function(t) {
         checkCollision(enemyD3);
-        // to effectively check colllsions we have to check a snapshot,
+        // to effectively check collisions we have to check a snapshot,
         // so we manually move the enemy object after the collision check
         enemyD3.attr('cx', oldX+(enemy.x - oldX)*t)
               .attr('cy',oldY+(enemy.y - oldY)*t);
