@@ -35,7 +35,6 @@ var drag = d3.behavior.drag()
             .origin(function(d) { return d;})
             .on('dragstart', dragstarted)
             .on('drag', dragged);
-            // .on('dragend', dragended)
 
 function dragstarted(d) {
   d3.event.sourceEvent.stopPropagation();
@@ -63,7 +62,10 @@ function dragged(d) {
   });
 }
 
+
+var colliding = false;
 var checkCollision = function(enemyD3) {
+  var helper = (enemyD3.attr('class')==='helper');
   // use the D3 object to get the current position at tween call moment
   var enemyX = enemyD3.attr('cx');
   var enemyY = enemyD3.attr('cy');
@@ -73,7 +75,10 @@ var checkCollision = function(enemyD3) {
   var dist = Math.sqrt(dx*dx+dy*dy);
   // hero.size*2 works as long as objects are the same size
   // could use hero.size+enemyD3.attr('r');
-  if ( dist < (hero.size * 2) ) {
+  if (!helper && dist < (hero.size + parseInt(enemyD3.attr('r'))) && !colliding) {
+    colliding = true;
+    gameBoard.select('.chaser').remove();
+    gameBoard.select('.helper').remove();
     var high = d3.select('.high').select('span');
     var current = d3.select('.current').select('span');
     var collisions = d3.select('.collisions').select('span');
@@ -84,8 +89,13 @@ var checkCollision = function(enemyD3) {
     current.text(0);
     d3.select(".gameBackDrop").style("background-color", "red")
     setTimeout( function() {
+      colliding = false;
       d3.select(".gameBackDrop").style("background-color", "#94B8FF")
     }, 300);
+  }
+  if (helper && dist < (hero.size + parseInt(enemyD3.attr('r')))) {
+    gameBoard.select('.helper').remove();
+    gameBoard.select('.chaser').remove();
   }
 };
 
@@ -95,8 +105,6 @@ var enemyArray = [];
 for(var i = 0; i < 10; i++){
   enemyArray.push( new Unit(randomize(), randomize()) );
 }
-
-
 
 var startingBoard = enemyArray.slice();
 startingBoard.push(hero);
@@ -116,6 +124,29 @@ gameBoard.selectAll("svg")
 function update() {
   var current = d3.select('.current').select('span');
   current.text(parseInt(current.text())+1);
+
+  if (parseInt(current.text())%5===0) {
+    gameBoard.selectAll('svg')
+      .data([new Unit(randomize(),randomize(),'chaser')])
+      .enter()
+      .append('circle')
+      .attr('cx',function(d){ return d.x;})
+      .attr('cy',function(d){ return d.y;})
+      .attr('class',function(d){ return d.type; })
+      .attr('r', function(d){ return d.size; });
+  }
+
+  if (parseInt(current.text())%10===0) {
+    gameBoard.selectAll('svg')
+      .data([new Unit(randomize(),randomize(),'helper')])
+      .enter()
+      .append('circle')
+      .attr('cx',function(d){ return d.x})
+      .attr('cy',function(d){ return d.y})
+      .attr('class',function(d){ return d.type; })
+      .attr('r', function(d){ return d.size*2; });
+  }
+
   gameBoard.selectAll('.enemy')
  //   .data(enemyArray)
     .transition()
@@ -134,14 +165,34 @@ function update() {
         enemyD3.attr('cx', oldX+(enemy.x - oldX)*t)
               .attr('cy',oldY+(enemy.y - oldY)*t);
       };
-    });/*
-    .attr("cx", function(d) {
-      d.newPosition();
-      return d.x;
-    })
-    .attr('cy', function(d) {
-      return d.y;
-    });*/
+    });
+
+  gameBoard.selectAll('.chaser')
+    .transition()
+    .duration(1500)
+    .tween('chase',function(chaser) {
+      var oldX = chaser.x;
+      var oldY = chaser.y;
+      chaser.x = hero.x;
+      chaser.y = hero.y;
+      var chaserD3 = d3.select(this);
+      return function(t) {
+        checkCollision(chaserD3);
+        chaserD3.attr('cx', oldX+(chaser.x-oldX)*t)
+          .attr('cy',oldY+(chaser.y-oldY)*t)
+          .attr('r', function(d) {
+            return d.size = d.size * 1.0025;
+          })
+      };
+    });
+
+    gameBoard.selectAll('.helper')
+      .transition()
+      .duration(1500)
+      .tween('helper',function(helper) {
+        var helperD3 = d3.select(this);
+        return function() { checkCollision(helperD3); };
+      });
 }
 
 setInterval(update,1500);

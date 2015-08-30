@@ -10,3 +10,12 @@
 .enemy {
   fill: #00f;
 }
+
+.chaser {
+  fill: #f00;
+}
+
+.helper {
+  fill: #ca0;
+}
+
